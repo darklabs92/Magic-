@@ -92,7 +92,7 @@ for (i in 1:iter) {
   # --------- End of Logistic Model Build ----------- #
   
   
-  # --------- NN model build -----------------------  #
+  # --------- SVM model build -----------------------  #
   #
   svmfit1 <- svm(x=trainSet[,-7],y=factor(trainSet[,7]), kernel="radial", cost=5)
   
@@ -116,7 +116,7 @@ for (i in 1:iter) {
   predLogTable <- cbind(predLogTable,n[,3])
   
   
-  # --------- End of NN Model Build ----------------  #
+  # --------- End of SVM Model Build ----------------  #
   
   # replenish the not visited data frame after every 5 runs
   ifelse(i%%6 == 0, not <- notf, not <- not[-sel,])

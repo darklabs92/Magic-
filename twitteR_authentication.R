@@ -6,12 +6,12 @@ library(devtools)
 library(stringi)
 library(twitteR)
 
-api_key <- "TJNQXDA1rGZwTTL7JPoOc6KLj"
+api_key <- ""
 
-api_secret <- "HDYeVpKdeWMNQkwLFRxMkxnFNC0GSemML1oCVYS3a4LjaKokTF"
+api_secret <- ""
 
-access_token <- "16280903-JPPOkKbNzZCiupElwzKDFPeV7BXxXS632rVVLCpao"
+access_token <- ""
 
-access_token_secret <- "4LKo4TJGejrGYwAbg7NRrRQeUcaXBzBNsz2da9JNxQcpy"
+access_token_secret <- ""
 
 setup_twitter_oauth(api_key,api_secret)

@@ -1,14 +1,17 @@
-#install.packages(c("devtools", "rjson", "bit64", "httr"))
-library(devtools)
-#1install_github("twitteR", username="geoffjentry")
-library(twitteR)
-#install.packages("plyr")
-library(plyr)
-#install.packages("tm")
-library(tm)
-# download the wordcloud generating package
-#install.packages(c("wordcloud","tm"),repos="http://cran.r-project.org")
-library("wordcloud")
+if(!require(devtools)) {
+  install.packages(c("devtools", "rjson", "bit64", "httr")); require(devtools)}
+
+if(!require(twitteR)) {
+  install.packages("twitteR"); require(twitteR)}
+
+if(!require(plyr)) {
+  install.packages("plyr"); require(plyr)}
+
+if(!require(tm)) {
+  install.packages("tm"); require(tm)}
+
+if(!require("wordcloud")) {
+  install.packages(c("wordcloud","tm"),repos="http://cran.r-project.org"); require("wordcloud")}
 
 #Setting up the OAuth Key
 api_key <- ""

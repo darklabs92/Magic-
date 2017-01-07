@@ -1,0 +1,137 @@
+FORMAT: 1A
+HOST: http://polls.apiblueprint.org/
+
+# toucanPaid
+
+_toucanPaid_ is a simple aggregation of APIs, built using Apiary BluePrint, allowing internal communication of data across various processes currently executed at **Toucan Pay**.
+
+## Apiary Blueprint
+
+This API documentation has been built on the [Apiary Platform](https://apiary.io/), courtesy [Blueprint](https://github.com/apiaryio)
+
+# Group Data Transfer
+
+Hereby, we can group certain processes which require / work on related data
+
+## Data Collection [/collect]
+
+
+### List All Formats Used [GET]
+
++ Response 200 (text/plain)
+
+    + Headers
+
+            My-Data-Format-Header: 42
+
+    + Body
+
+            Excel, CSV, Flat files, HDFS
+
++ Response 200 (application/json)
+
+        [
+            {
+                "question": "Which all data formats are currently used, during collection & storageg?",
+                "published_at": "2017-07-01T11:07:37.620Z",
+                "choices": [
+                    {
+                        "choice": "Excel",
+                        "votes": 19683
+                    }, {
+                        "choice": "CSV",
+                        "votes": 7625597484987
+                    }, {
+                        "choice": "Flat files",
+                        "votes": 27
+                    }, {
+                        "choice": "HDFS",
+                        "votes": 1
+                    }
+                ]
+            }
+        ]
+
+### Ask User Preferred Data Format [POST]
+
+
+
++ Request (application/json)
+
+        {
+            "question": "What data format do you tend to use?",
+            "choices": [
+                "Excel",
+                "CSV",
+                "Flat Files",
+                "HDFS"
+            ]
+        }
+
++ Response 203 (application/json)
+
+    + Headers
+
+            Location: /collect/2
+
+    + Body
+
+            {
+                "question": "What data format do you tend to use?",
+                "published_at": "2017-07-01T11:07:37.620Z",
+                "choices": [
+                    {
+                        "choice": "Excel",
+                        "votes": 1
+                    }, {
+                        "choice": "CSV",
+                        "votes": 1
+                    }, {
+                        "choice": "Flat files",
+                        "votes": 1
+                    }, {
+                        "choice": "HDFS",
+                        "votes": 1
+                    }
+                ]
+            }
+
+
+
+## Data Distribution [/distribute/{?limit}]
+
++ Parameters
+
+    + limit (number, optional) - The maximum number of results to return.
+        + Default: `20`
+
+### View the format of last few files sent [GET]
+
++ Response 200 (application/json)
+
+        {
+            "question": "Favourite programming language?",
+            "published_at": "2017-07-01T11:07:37.620Z",
+            "choices": [
+                {
+                    "choice": "Excel",
+                    "votes": 5
+                }, {
+                    "choice": "CSV",
+                    "votes": 24
+                }, {
+                    "choice": "Flat files",
+                    "votes": 18
+                }, {
+                    "choice": "HDFS",
+                    "votes": 13
+                }
+            ]
+        }
+    
+
+### Delete [DELETE]
+
++ Response 200 (text/plain)
+
+        YOLO!

@@ -52,9 +52,11 @@ Hereby, we can group certain processes which require / work on related data
             }
         ]
 
+
+
+
+
 ### Ask User Preferred Data Format [POST]
-
-
 
 + Request (application/json)
 
@@ -106,6 +108,16 @@ Hereby, we can group certain processes which require / work on related data
         + Default: `20`
 
 ### View the format of last few files sent [GET]
+
++ Response 401
+    + Headers
+
+            WWW-Authenticate: Basic realm="protected"
+
++ Request
+    + Headers
+
+            Authorization: Basic ABCDEF123
 
 + Response 200 (application/json)
 

@@ -9,6 +9,7 @@ from __future__ import unicode_literals
 import os
 import sys  
 reload(sys)  
+import pdfminer
 sys.setdefaultencoding('utf8')
 from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
 from pdfminer.pdfpage import PDFPage
@@ -18,8 +19,8 @@ from cStringIO import StringIO
 
 def pdfparser(data):
     dest = data[:-3]+"txt"    
-    print "\n\n\n\n\n",dest    
-    fp = file(data, 'rb')
+    #print "\n\n\n\n\n",dest    
+    fp = file(data, 'r+b')
     rsrcmgr = PDFResourceManager()
     retstr = StringIO()
     codec = 'utf-8'
@@ -34,12 +35,12 @@ def pdfparser(data):
         data = unicode(data,'utf-8', errors='ignore')
     #print data
     # write data to a file
-    print data
+    #print data
     with open(dest, "w") as f:
         f.write(data)
     
 # set the working directory
-path = "F:/banking/payments/"
+path = "F:/banking/payments/pdf2excel/"
 os.chdir(path)
 fls=os.listdir(path)
 

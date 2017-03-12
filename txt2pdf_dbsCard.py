@@ -159,9 +159,6 @@ for f in fils2:
                                     else:
                                         break
                                 
-                        
-                        
-                    
                 
                 #print fileList[ctry]
         numTrans = tri + 1 - (k2 + 2)
@@ -171,4 +168,11 @@ for f in fils2:
             # store the descriptions of the individual transactions
             desc.append(fileList[tri2])
         
-        
+        # hereby, store the Metadata as a CSV in 'path'
+        nme_f = f.split(" ")[0]
+        for nme1 in f.split(" ")[1:]:
+            nme_f = nme_f+"_"+nme1
+        nme_f = nme_f[:-4]+"metadata.csv"
+        dst1 = path + nme_f
+        metadataDf = pd.DataFrame(metadata[1:], columns = metadata[0])
+        metadataDf.to_csv(dst1, header=True, index=False)

@@ -22,6 +22,17 @@ def convertMoney(strr):
         if l not in remove:
             st = st + l
     return float(st)
+
+def checkIfNumeric(arrays):
+    valReturn = []
+    for i1 in arrays:
+        try:
+            float(i1.strip())
+            valReturn.append(float(i1.strip()))
+        except ValueError:
+            #print i1, " is Not a float"
+            continue
+    return valReturn
     
 
 # for each TXT file present in the 'path' folder
@@ -86,7 +97,7 @@ for f in fils2:
                 chk = k
                 print "Transactions begin from line",k+1
                 break
-        for k2 in range(chk,chk+250):
+        for k2 in range(chk,chk+500):
             if "NEW TRANSACTIONS" in fileList[k2]:
                 print "Dates of Transactions begin from line",k2+2
                 break
@@ -100,8 +111,59 @@ for f in fils2:
         for k3 in range(tri,len(fileList)):
             if "GRAND TOTAL FOR" in fileList[k3]:
                 print "Total Amount Payable is",fileList[k3+2].strip()
+                # store the Grand Total due towards the CC for the current month's bill
                 metadata.append(["GRAND TOTAL", convertMoney(fileList[k3+2].strip())])
                 break
+        ctry = len(fileList)
+        for k4 in range(tri, len(fileList)):
+            if "DAILY$ AVAILABLE :" in fileList[k4]:
+                ctry = k4
+                amt = checkIfNumeric(fileList[ctry].split(" "))
+                print "Total Daily$ available this month are", amt[0]
+                #metadata.append(["TOTAL DAILY$ AVAILABLE ", amt[0]])
+                break
+        for k5 in range(ctry, len(fileList)):
+            if "BALANCE AS OF" in fileList[k5]:
+                ctry2 = k5
+                ckhFloat = 0
+                ckhBrk = 0
+                for k6 in range(ctry2, ctry2+20):
+                    if len(checkIfNumeric(fileList[k6].split()))>0:
+                        ckhFloat = ckhFloat+1
+                        if ckhFloat>1:
+                            ctry3 = k6
+                    else:
+                        if fileList[k6]=="\n":
+                            if ckhFloat<2:
+                                continue
+                            else:
+                                print f, "Total Daily $ Balance", fileList[ctry3]
+                                numToStore = checkIfNumeric(fileList[ctry3].split())[0]
+                                # store the Total Daily $ Transactions on the CC for the current month's bill, if the value is less than 1000 dollars
+                                # have put this check as the credit card number is also being captured in this process
+                                # can resolve it later by checking if the file input / line value is same as credit card no
+                                # not done it now as we do not want to capture / store the CC no ANYWHERE! :)
+                                if numToStore<1000:
+                                    if ckhFloat==2:
+                                        # store the Total Daily $ Available on the CC for the current month's bill
+                                        metadata.append(["Total DAILY$ Available", numToStore])
+                                        print ckhFloat,"Available",checkIfNumeric(fileList[ctry3].split())[0]
+                                    elif ckhFloat/2<3:
+                                        # store the Total Daily $ Earned on the CC for the current month's bill
+                                        metadata.append(["Total DAILY$ Earned ", numToStore])
+                                        print ckhFloat, "Earned",numToStore
+                                    elif ckhFloat/2<4:
+                                        # store the Total Daily $ Redeemed / Adjusted on the CC for the current month's bill
+                                        metadata.append(["Total DAILY$ Redeemed / Adjusted", numToStore])
+                                        print  ckhFloat,"Redeemed",numToStore
+                                    else:
+                                        break
+                                
+                        
+                        
+                    
+                
+                #print fileList[ctry]
         numTrans = tri + 1 - (k2 + 2)
         
         for tri2 in range(tri+1,tri+2+numTrans):

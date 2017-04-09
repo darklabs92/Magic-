@@ -9,7 +9,7 @@ Created on Fri Apr 06 00:47:58 2017
 # Intial Environment setup and reading of files
 ###
 
-# Aim of program is to predict peopl most likely to default on their payment,
+# Aim of program is to predict people most likely to default on their payment,
 # based on their past credit usage patterns
 
 # import the necessary packages
@@ -26,7 +26,7 @@ from pandas.tools.plotting import scatter_matrix
 import sklearn
 from sklearn.feature_selection import RFE, SelectKBest, chi2
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn import metrics
 
 
@@ -65,10 +65,28 @@ testPd.describe()
 
 # if mean ~ median, progrnosis = normally distributed
 #   revolvngUnsecuredUtilised should ONLY lie b/w 0 and 1, yet it has a max value of 50708
-#   monthlyIncome and fmlyMembrs have a lot of NaNs 
-#   
+#   debtRatio should ONLY  lie b/w 0 and 1, yet it has a max value of 329664
+#   monthlyIncome and fmlyMembrs have a lot of NaNs(determined by difference in count of their records and that of DF)
 
-### id the problematic fields 
+## determine how many NULL values exist across Train & Test DS
+# train
+colNullCnt = []
+
+for z in range(len(cols)):
+    colNullCnt.append([cols[z], sum(pd.isnull(trainPd[cols[z]]))])
+
+colNullCnt
+
+#test
+colNullCnt2 = []
+
+for z in range(len(cols)):
+    colNullCnt2.append([cols[z], sum(pd.isnull(testPd[cols[z]]))])
+
+colNullCnt2
+
+
+## id the problematic fields
 
 # train - Revolve Utilisation
 revolvIndx = list(trainPd.loc[:,'revolvngUnsecuredUtilised']>1.0)
@@ -128,6 +146,7 @@ testMnthIncmIndx = [rw for rw in range(len(testMnthIncm)) if math.isnan(testMnth
     # 21123 [20.81%] are either nan or deciaml values - which are possibly wrong
 len(testMnthIncmIndx)
 
+
 # these are abnormal values - each lst holds records with values above 1
 rmvIndx2 = []
 for z in revolveGrtrThn1:
@@ -148,37 +167,92 @@ for z in rmvIndx2:
     if z in rmvIndx3:
         rmv2.append(z)
 
+###
+# there is also the case where there are records having multiple entries (i.e. > 0) in either 2 or 3 of the date related cols
+# these entries indicate wrong entries / tampering with the data, hence require attention too!
+# however, due to the man hour constraints, will devote time to other areas of the problem
+###
 
-rmv = list(np.unique(rmvIndx2))
+# list of final Indices to remove - they cause problems in ALL of the columns above!
+rmv = list(np.unique(rmv2))
 len(rmv)
 
+# remove these rows from trainPd to have a cleaner DS to train on 
+trainPd.drop(trainPd.index[rmv2])
 
+## Above, we have tried to clean up the rows of the DS (1 of the dimensions)
+## Now, update the columnar contents (2nd dimension) to reflect cleaner DS for further training
+#
 
-# remove the rows which are quite problematic
+# we hereby learn that possibly one of the most critical variables - monthly income - almost has 
+# a staggering 20% values as missing / NaN!
+# this leads me to question how much more dirty is this data ..?
+# depending on each scenario, we can determine how to proceed - 
+#   1. impute the values via simple stats (mean, median, mode, etc.)
+#   2. predict the values based on other factors
+#   3. discard the record altogether, as this brings in questions of data integrity (how do we know how valid / correct is the rest of that given entry?!)
+#   4. use a filler / predetermined value in place of the missing values
+# given the huge no of missing vals, we can rule out option 3 as it will greatly decrease our # of training records
+# also, since quite a few of these may be impactful variables, it may not be in our best interests to use a fixed val for the widely varying range of data points (records) we have
+# so, for now, let us use a simple mean of EACH COL
 
-trainDumpFmly = trainPd[np.isfinite(trainPd['fmlyMembrs'])]
-testDumpFmly = testPd[np.isfinite(testPd['fmlyMembrs'])]
-
-# determine how many NULL values exist across Train & Test DS
-#train
-colNullCnt = []
+# this function helps to cleanse the columns found problematic above - for trainPd and testPd
+def cleanUpDFcols(colName, colProblemIndx, testColProblemIndx):
+    trainCol = list(trainPd[[colName]].values.flatten())
+    print "finished with flattening input column for ", colName 
+    tmpGoodValLst = [trainCol[z2] for z2 in range(len(trainCol)) if z2 not in colProblemIndx]
+    print "finished with tmpGoodValLst for ", colName 
+    avgGoodColVals = np.average(tmpGoodValLst)
+    finalLstVals = []
+    for s in range(len(trainCol)):
+        if s not in colProblemIndx:
+            finalLstVals.append(trainCol[s])
+        else:
+            if colName=='fmlyMembrs':
+                finalLstVals.append(math.ceil(avgGoodColVals))
+            else:
+                finalLstVals.append(avgGoodColVals)
+    print "starting with TrainPd for ", colName 
+    trainPd[[colName]] = pd.Series(finalLstVals, index = trainPd.index)
+    print "finished with TrainPd for ", colName 
+    
+    testTrainCol = list(testPd[[colName]].values.flatten())
+    print "finished with flattening input column for ", colName 
+    testTmpGoodValLst = [testTrainCol[z2] for z2 in range(len(testTrainCol)) if z2 not in testColProblemIndx]
+    print "finished with testTmpGoodValLst for ", colName 
+    testAvgGoodColVals = np.average(testTmpGoodValLst)
+    testFinalLstVals = []
+    for s2 in range(len(testTrainCol)):
+        if s2 not in testColProblemIndx:
+            testFinalLstVals.append(testTrainCol[s2])
+        else:
+             if colName=='fmlyMembrs':
+                testFinalLstVals.append((math.ceil(testAvgGoodColVals)))
+             else:
+                testFinalLstVals.append(testAvgGoodColVals)
+    print "starting with TestPd for ", colName 
+    testPd[[colName]] = pd.Series(testFinalLstVals, index = testPd.index)
+    print "finished with TestPd for ", colName
+    return tmpGoodValLst, testTmpGoodValLst
+    
 
 for z in range(len(cols)):
-    colNullCnt.append([cols[z], sum(pd.isnull(trainPd[cols[z]]))])
-
-colNullCnt
-
-#test
-colNullCnt2 = []
-
-for z in range(len(cols)):
-    colNullCnt2.append([cols[z], sum(pd.isnull(testPd[cols[z]]))])
-
-colNullCnt2
+    if cols[z]=='revolvngUnsecuredUtilised':
+        revolv_goodVals_Train, revolv_goodVals_Test = cleanUpDFcols('revolvngUnsecuredUtilised', revolveGrtrThn1, testRevolveGrtrThn1)
+    elif cols[z] == 'debtRatio':
+        dR_goodVals_Train, dR_goodVals_Test = cleanUpDFcols('debtRatio', dRGrtrThn1, testDRGrtrThn1)
+    elif cols[z] == 'fmlyMembrs':
+        fM_goodVals_Train, fM_goodVals_Test = cleanUpDFcols('fmlyMembrs', fmlyMembrIndx, testFmlyMembrIndx)
+    elif cols[z] == 'monthlyIncm':
+        inc_goodVals_Train, inc_goodVals_Test = cleanUpDFcols('monthlyIncm', mnthIncmIndx, testMnthIncmIndx)
+    else:
+        continue
+        
 
 # Impute the missing values with the mean of each col
-trainPd_fild = trainPd.fillna(math.ceil(trainPd.mean()), inplace = False)
-testPd_fild = testPd.fillna(math.ceil(testPd.mean()), inplace = False)
+trainPd_fild = copy.copy(trainPd)
+testPd_fild = copy.copy(testPd)
+
 
 
 # view how each variable is distributed and come up with initial prognosis
@@ -194,84 +268,95 @@ for z2 in range(len(cols)):
 #scatter_matrix(trainPd, alpha=0.5, figsize=(12, 12), diagonal='kde')
 
 
-# we hereby learn that possibly one of the most critical variables - monthly income - almost has 
-# a staggering 20% values as missing / NaN!
-# this leads me to question how much more dirty is this data ..?
-# depending on each scenario, we can determine how to proceed - 
-#   1. impute the values via simple stats (mean, median, mode, etc.)
-#   2. predict the values based on other factors
-#   3. discard the record altogether, as this brings in questions of data integrity (how do we know how valid / correct is the rest of that given entry?!)
-#   4. use a filler / predetermined value in place of the missing values
-# given the huge no of missing vals, we can rule out option 3 as it will greatly decrease our # of training records
-# also, since monthly income may lead to be an impactful variable, it may not be in our best interests to use a fixed Monthly Income for the widely varying range of data points (records) we have
-# so, for now, let us use a simple mean of EACH COL (line 63: trainPd_fild)
-
-# basic avg training set
-trainPd__fild_indpndnt = trainPd_fild[trainPd_fild.columns.difference(['seriousDlq2yr', 'id'])].copy()
-trainPd__fild_dpndnt = trainPd_fild['seriousDlq2yr'].copy()
-
 # training_ds
+trainPd_indpndnt = trainPd[trainPd.columns.difference(['seriousDlq2yr', 'id'])].copy()
+trainPd_dpndnt = trainPd['seriousDlq2yr'].copy()
 
-testPd_inp = testPd_fild[testPd_fild.columns.difference(['seriousDlq2yr', 'id'])]
-testPd_outp = testPd_fild[['id','seriousDlq2yr']].copy()
+msk = np.random.rand(len(trainPd_indpndnt)) < 0.8
 
-msk = np.random.rand(len(trainPd__fild_indpndnt)) < 0.8
-
-model = LogisticRegression()
-# create the RFE model and select 3 attributes
-rfe = RFE(model, 5)
-rfe = rfe.fit(trainPd__fild_indpndnt, trainPd__fild_dpndnt)
-
-print(rfe.support_)
-print(rfe.ranking_)
-
-for e in range(len(list(rfe.ranking_))):
-    print rfe.ranking_[e]
-    print rfe.support_[e]
-    print trainPd__fild_indpndnt.columns[e]
-    print ""
+# testing_ds
+testPd_inp = testPd[testPd.columns.difference(['seriousDlq2yr', 'id'])]
+testPd_outp = testPd[['id','seriousDlq2yr']].copy()
 
 
+
+###
+# Build the different models which shall be used
+###
+
+##
+# Logistic Regression on all independent variables
 modelLog = LogisticRegression()
-modelLog.fit_transform(trainPd__fild_indpndnt, trainPd__fild_dpndnt)
-testPd_outp['seriousDlq2yr'] = modelLog.predict(testPd_inp)
+modelLog.fit_transform(trainPd_indpndnt, trainPd_dpndnt)
 testPd_outp.columns = ['Id','Probability']
-#testPd_outp.to_csv(path+"try1.csv", header=True, index=False)
+testPd_outp['Probability'] = modelLog.predict(testPd_inp)
+testPd_outp.to_csv(path+"try2.csv", header=True, index=False)
 
 # decision tree
 # naive bayes
 # ensemble
 
-test = SelectKBest(score_func=chi2, k=5)
-fit = test.fit(trainPd__fild_indpndnt, trainPd__fild_dpndnt)
+
+# Logistic Regression on top 4 significant variables (determined via Chi-Sq.)
+#
+test = SelectKBest(score_func=chi2, k=4)
+fit = test.fit(trainPd_indpndnt, trainPd_dpndnt)
 
 for z in range(len(fit.scores_)):
-    print z, fit.scores_[z], trainPd__fild_indpndnt.columns[z], fit.get_support()[z]
+    print z, fit.scores_[z], trainPd_indpndnt.columns[z], fit.get_support()[z]
 
 train_ind_4select = trainPd_fild[['debtRatio','monthlyIncm','num60to89only','num90aab']].copy()
 
 test_ind_4select = testPd_fild[['debtRatio','monthlyIncm','num60to89only','num90aab']].copy()
 
 modelLog = LogisticRegression()
-modelLog.fit_transform(train_ind_4select, trainPd__fild_dpndnt)
+modelLog.fit_transform(train_ind_4select, trainPd_dpndnt)
 testPd_outp['seriousDlq2yr'] = modelLog.predict(test_ind_4select )
 testPd_outp.columns = ['Id','Probability']
-testPd_outp.to_csv(path+"try1_select4best_chi.csv", header=True, index=False)
+testPd_outp.to_csv(path+"try2_select4best_chi.csv", header=True, index=False)
 
 
 np.set_printoptions(precision=3)
 print(fit.scores_)
-features = fit.transform(trainPd__fild_indpndnt)
+features = fit.transform(trainPd_indpndnt)
 # summarize selected features
 print(features[0:5,:])
 
+
+# Determine the significant variables determined via usage of Extended Tree Classifiers
+#
 model = ExtraTreesClassifier()
-model.fit(trainPd__fild_indpndnt, trainPd__fild_dpndnt)
+model.fit(trainPd_indpndnt, trainPd_dpndnt)
 # display the relative importance of each attribute
 print(model.feature_importances_)
 
 for z in range(len(model.feature_importances_)):
-    print z, trainPd__fild_indpndnt.columns[z], model.feature_importances_[z]
+    print z, trainPd_indpndnt.columns[z], model.feature_importances_[z]
+testPd_outp['seriousDlq2yr'] = model.predict(testPd_inp)
+testPd_outp.columns = ['Id','Probability']
+testPd_outp.to_csv(path+"try2_ETC.csv", header=True, index=False)
+
+
+
+# Random Forest (RF) Classifier on all input variables - reduces variance and bias
+#
+model = RandomForestClassifier()
+model.fit(trainPd_indpndnt, trainPd_dpndnt)
+testPd_outp['seriousDlq2yr'] = model.predict(testPd_inp)
+testPd_outp.columns = ['Id','Probability']
+testPd_outp.to_csv(path+"try2_RF.csv", header=True, index=False)
+
+
+train_ind_rndmSelect = trainPd_fild[['debtRatio','monthlyIncm','num60to89only','num90aab']].copy()
+test_ind_rndmSelect = testPd_fild[['debtRatio','monthlyIncm','num60to89only','num90aab']].copy()
+
+
+model = RandomForestClassifier()
+model.fit(trainPd_indpndnt, trainPd_dpndnt)
+testPd_outp['seriousDlq2yr'] = model.predict(testPd_inp)
+testPd_outp.columns = ['Id','Probability']
+testPd_outp.to_csv(path+"try2_RF.csv", header=True, index=False)
+
 
 
     

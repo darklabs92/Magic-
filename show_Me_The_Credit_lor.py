@@ -28,6 +28,7 @@ from sklearn.feature_selection import RFE, SelectKBest, chi2
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn import metrics
+from sklearn.metrics import roc_auc_score
 
 
 # set the path where the files are stored
@@ -249,10 +250,29 @@ for z in range(len(cols)):
         continue
         
 
+# engineer some new features
+balanceIncomeLeft_train = []
+balanceIncomeLeft_test = []
+
+debtRatio_train = list(trainPd.debtRatio)
+monthlyInc_train = list(trainPd.monthlyIncm)
+debtRatio_test = list(testPd.debtRatio)
+monthlyInc_test = list(testPd.monthlyIncm)
+
+
+for rw2 in range(len(trainPd)):
+    balanceIncomeLeft_train.append((1.0 - debtRatio_train[rw2])*monthlyInc_train[rw2])
+    
+for rw3 in range(len(testPd)):
+    balanceIncomeLeft_test.append((1.0 - debtRatio_test[rw3])*monthlyInc_test[rw3])
+
+testPd['balanceIncome'] = pd.Series(balanceIncomeLeft_test, index = testPd.index, dtype=np.float64)
+trainPd['balanceIncome'] = pd.Series(balanceIncomeLeft_train, index = trainPd.index, dtype=np.float64)
+
+
 # Impute the missing values with the mean of each col
 trainPd_fild = copy.copy(trainPd)
 testPd_fild = copy.copy(testPd)
-
 
 
 # view how each variable is distributed and come up with initial prognosis
@@ -268,11 +288,19 @@ for z2 in range(len(cols)):
 #scatter_matrix(trainPd, alpha=0.5, figsize=(12, 12), diagonal='kde')
 
 
+
+
 # training_ds
 trainPd_indpndnt = trainPd[trainPd.columns.difference(['seriousDlq2yr', 'id'])].copy()
 trainPd_dpndnt = trainPd['seriousDlq2yr'].copy()
 
 msk = np.random.rand(len(trainPd_indpndnt)) < 0.8
+
+trainPd_indpndnt_train = trainPd_indpndnt[msk]
+trainPd_indpndnt_test = trainPd_indpndnt[~msk]
+trainPd_dpndnt_train = trainPd_dpndnt[msk]
+trainPd_dpndnt_test = trainPd_dpndnt[~msk]
+
 
 # testing_ds
 testPd_inp = testPd[testPd.columns.difference(['seriousDlq2yr', 'id'])]
@@ -287,7 +315,11 @@ testPd_outp = testPd[['id','seriousDlq2yr']].copy()
 ##
 # Logistic Regression on all independent variables
 modelLog = LogisticRegression()
-modelLog.fit_transform(trainPd_indpndnt, trainPd_dpndnt)
+modelLog.fit_transform(trainPd_indpndnt_train, trainPd_dpndnt_train)
+
+pred = modelLog.predict(trainPd_indpndnt_test)
+roc_auc_score(trainPd_dpndnt_test, pred)
+
 testPd_outp.columns = ['Id','Probability']
 testPd_outp['Probability'] = modelLog.predict(testPd_inp)
 testPd_outp.to_csv(path+"try2.csv", header=True, index=False)
@@ -299,18 +331,27 @@ testPd_outp.to_csv(path+"try2.csv", header=True, index=False)
 
 # Logistic Regression on top 4 significant variables (determined via Chi-Sq.)
 #
-test = SelectKBest(score_func=chi2, k=4)
+test = SelectKBest(score_func=chi2, k=5)
 fit = test.fit(trainPd_indpndnt, trainPd_dpndnt)
 
 for z in range(len(fit.scores_)):
     print z, fit.scores_[z], trainPd_indpndnt.columns[z], fit.get_support()[z]
 
-train_ind_4select = trainPd_fild[['debtRatio','monthlyIncm','num60to89only','num90aab']].copy()
+train_ind_4select = trainPd_fild[['debtRatio','balanceIncome','num60to89only','num90aab']].copy()
 
-test_ind_4select = testPd_fild[['debtRatio','monthlyIncm','num60to89only','num90aab']].copy()
+test_ind_4select = testPd_fild[['debtRatio','balanceIncome','num60to89only','num90aab']].copy()
 
 modelLog = LogisticRegression()
 modelLog.fit_transform(train_ind_4select, trainPd_dpndnt)
+
+pred = modelLog.predict(trainPd_indpndnt_test)
+roc_auc_score(trainPd_dpndnt_test, pred)
+
+print(metrics.classification_report(trainPd_dpndnt_test, pred))
+print(metrics.confusion_matrix(trainPd_dpndnt_test, pred))
+
+
+
 testPd_outp['seriousDlq2yr'] = modelLog.predict(test_ind_4select )
 testPd_outp.columns = ['Id','Probability']
 testPd_outp.to_csv(path+"try2_select4best_chi.csv", header=True, index=False)
@@ -332,33 +373,38 @@ print(model.feature_importances_)
 
 for z in range(len(model.feature_importances_)):
     print z, trainPd_indpndnt.columns[z], model.feature_importances_[z]
-testPd_outp['seriousDlq2yr'] = model.predict(testPd_inp)
-testPd_outp.columns = ['Id','Probability']
-testPd_outp.to_csv(path+"try2_ETC.csv", header=True, index=False)
-
 
 
 # Random Forest (RF) Classifier on all input variables - reduces variance and bias
 #
-model = RandomForestClassifier()
-model.fit(trainPd_indpndnt, trainPd_dpndnt)
-testPd_outp['seriousDlq2yr'] = model.predict(testPd_inp)
-testPd_outp.columns = ['Id','Probability']
-testPd_outp.to_csv(path+"try2_RF.csv", header=True, index=False)
-
-
 train_ind_rndmSelect = trainPd_fild[['debtRatio','monthlyIncm','num60to89only','num90aab']].copy()
+train_dep_rndmSelect = trainPd_fild[['seriousDlq2yr']].copy()
+
+trainPd_indpndnt_train = train_ind_rndmSelect[msk]
+trainPd_indpndnt_test = train_ind_rndmSelect[~msk]
+trainPd_dpndnt_train = train_dep_rndmSelect[msk]
+trainPd_dpndnt_test = train_dep_rndmSelect[~msk]
+
 test_ind_rndmSelect = testPd_fild[['debtRatio','monthlyIncm','num60to89only','num90aab']].copy()
 
 
-model = RandomForestClassifier()
-model.fit(trainPd_indpndnt, trainPd_dpndnt)
-testPd_outp['seriousDlq2yr'] = model.predict(testPd_inp)
+
+
+modelRFC = RandomForestClassifier()
+modelRFC.fit(trainPd_indpndnt_train, trainPd_dpndnt_train)
+
+pred = modelRFC.predict(trainPd_indpndnt_test)
+roc_auc_score(trainPd_dpndnt_test, pred)
+
+print(metrics.classification_report(trainPd_dpndnt_test, pred))
+print(metrics.confusion_matrix(trainPd_dpndnt_test, pred))
+
+testPd_outp['seriousDlq2yr'] = model.predict(test_ind_rndmSelect)
 testPd_outp.columns = ['Id','Probability']
-testPd_outp.to_csv(path+"try2_RF.csv", header=True, index=False)
+testPd_outp.to_csv(path+"try3_RF.csv", header=True, index=False)
 
-
-
+# eval criteria for RFC model
+modelRFC.criterion
     
 #model.fit(dataset.data, dataset.target)
 
@@ -369,3 +415,4 @@ testPd_outp.to_csv(path+"try2_RF.csv", header=True, index=False)
 #print(metrics.classification_report(expected, predicted))
 
 #print(metrics.confusion_matrix(expected, predicted))
+
